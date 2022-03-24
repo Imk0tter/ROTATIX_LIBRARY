@@ -3,18 +3,18 @@ import rotatix_util
 import math
 
 class Rotatix_Arm:
-    def __init__(self, child=None, rotations=1, length=50, color_in=[0, 0, 0], color_out=[0, 0, 0], **kwargs):
+    def __init__(self, child=None, rotations=1, length=50, color_in=[0, 0, 0], color_out=[0, 0, 0], draw=True, **kwargs):
         self.child = child
         self.length = length
         self.rotations = rotations
         self.color_in = color_in
         self.color_out = color_out
-
+        self.draw = draw
     def rasterize(self, iteration=1, x=0, y=0, degrees_per_radian=1, **kwargs):
         current_x = (math.sin(((self.rotations / degrees_per_radian * iteration)) % (math.pi * 2)) * self.length) + x
         current_y = (math.cos(((self.rotations / degrees_per_radian * iteration)) % (math.pi * 2)) * self.length) + y
 
-        return self.color_in, self.color_out, current_x, current_y
+        return self.draw, self.color_in, self.color_out, current_x, current_y
 
 
 class Rotatix_Sketch:
@@ -30,8 +30,14 @@ class Rotatix_Sketch:
 
         self.arm = None
 
+        self.arm_count = 0
         for x, y in zip(rotations, lengths):
-            self.add_arm(Rotatix_Arm(length=(50,y)[y > 0], rotations=x))
+            self.arm_count + self.arm_count + 1
+            if self.arm_count == len(rotations) - 1:
+                draw = True
+            else:
+                draw = False
+            self.add_arm(Rotatix_Arm(length=(50,y)[y > 0], rotations=x, draw=draw))
 
     def rasterize_size(self):
 
@@ -47,13 +53,16 @@ class Rotatix_Sketch:
         temp_arm = self.arm
 
         result = []
+
+        temp_arms = []
         while temp_arm != None:
             current_rasterization = temp_arm.rasterize(degrees_per_radian=self.degrees_per_radian, iteration=iteration, x=x, y=y)
-            color_in = current_rasterization[0]
-            color_out = current_rasterization[1]
 
-            x = current_rasterization[2]
-            y = current_rasterization[3]
+            color_in = current_rasterization[1]
+            color_out = current_rasterization[2]
+
+            x = current_rasterization[3]
+            y = current_rasterization[4]
 
             result.append(current_rasterization)
             temp_arm = temp_arm.child
@@ -74,7 +83,7 @@ class Rotatix_Sketch:
                     break
                 else:
                     temp_arm = temp_arm.child
-
+        self.arm_count = self.arm_count + 1
     def remove_arm(self, position = 0):
         temp_arm = self.arm
         previous_arm = None
@@ -85,6 +94,7 @@ class Rotatix_Sketch:
             previous_arm.child = temp_arm
         else:
             self.arm = temp_arm
+        self.arm_count = self.arm_count - 1
 
 
 # Testing

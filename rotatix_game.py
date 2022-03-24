@@ -3,7 +3,8 @@ import math
 import time
 
 import arcade
-from abc import ABC, abstractmethod
+
+import arcade.gui
 
 import rotatix
 
@@ -43,17 +44,16 @@ class ROTATIX_OBJECT:
         self.iteration = 0
 
     def update(self, delta=0, mousex=150, mousey=150):
-        self.iteration = self.iteration + 1
-
         current_coordinates = self.get_arm_coordinates()
         rectified_coordinates = []
         for i in current_coordinates:
             rectified_coordinates.append(i)
         self.coordinates = tuple(rectified_coordinates)
 
-        if self.iteration < self.rotatix_sketch.sides:
+        if self.iteration <= self.rotatix_sketch.sides:
             coordinate_element = rectified_coordinates[-1:][0][2][1]
             self.drawing.append(coordinate_element)
+        self.iteration = self.iteration + 1
     def get_drawable_elements(self):
         return tuple(self.coordinates), self.drawing
     def get_arm_coordinates(self):
@@ -63,7 +63,10 @@ class ROTATIX_OBJECT:
         coordinates = self.rotatix_sketch.rasterize(x=0, y=0, iteration=iteration)
 
         result = []
-        for color_in, color_out, x, y in coordinates:
+
+        #print("COORDINATES: " + str(coordinates))
+
+        for draw, color_in, color_out, x, y in coordinates:
             current_coordinates = x, y
             result.append((color_in, color_out, (point, current_coordinates)))
             point = current_coordinates
@@ -86,9 +89,11 @@ class Rotatix_Sketch_Entity:
 
         self.draw_border = True
 
-        for coords in rotatix_object.drawing:
-            coords = coords[0], coords[1]
-            self.rotatix_drawing_coordinates.append(coords)
+        # coords in rotatix_object.drawing:
+
+            # coords = coords[0], coords[1]
+
+            # self.rotatix_drawing_coordinates.append(coords)
 
     def update(self, new=False):
 
@@ -97,20 +102,84 @@ class Rotatix_Sketch_Entity:
 
             self.rotatix_drawing_coordinates.clear()
 
-            for iteration in range(0, rotatix_sketch.sides):
-                current_point = rotatix_sketch.rasterize(iteration=iteration, x=0, y=0)[-1:][0][2][1]
-                self.rotatix_drawing_coordinates.append(current_point)
+            for iteration in range(0, rotatix_sketch.sides + 1):
+                current_iteration = rotatix_sketch.rasterize(iteration=iteration, x=0, y=0)
 
-        self.iteration = self.iteration + 1
+                arm_number = 0
+                self.rotatix_drawing_coordinates.append([])
 
+                for current_arm_data in current_iteration:
+                    if current_arm_data[0]:
+                        self.rotatix_drawing_coordinates[iteration].append([])
+
+                        color_in = current_arm_data[1]
+                        color_out = current_arm_data[2]
+                        point = current_arm_data[3:5]
+
+                        drawing_data = (tuple(color_in), tuple(color_out), tuple(point))
+                        self.rotatix_drawing_coordinates[iteration][arm_number].append(drawing_data)
+                        arm_number = arm_number + 1
+
+                #current_point = rotatix_sketch.rasterize(iteration=iteration, x=0, y=0)[-1:][0][2:4]
+                #self.rotatix_drawing_coordinates.append(current_point)
+             # print ("ROTATIX_DRAWING_COORDINATES: " + str(self.rotatix_drawing_coordinates))
+
+        else:
+            self.iteration = self.iteration + 1
+
+    def render(self, centerx=0, centery=0):
+
+        last_coordinate = []
+
+        current_arm_coordinate = []
+        last_arm_coordinate = []
+
+        for current_iteration_coordinates in self.rotatix_drawing_coordinates:
+            # print("current_iteration_coordinates: " + str(current_iteration_coordinates))
+            current_arm_number = 0
+            current_arm_coordinate = []
+            for current_arm_coordinates in current_iteration_coordinates:
+                color_in = current_arm_coordinates[0][0]
+                color_out = current_arm_coordinates[0][1]
+                point = current_arm_coordinates[0][2]
+
+                current_coordinate = color_in, color_out, (point[0] + self.x + centerx, point[1] + self.y + centery)
+
+                current_arm_coordinate.append(current_coordinate)
+
+                #if last_coordinate:
+                    #arcade.draw_lines(point_list=(last_coordinate[2], current_coordinate[2]), line_width=1,color=current_coordinate[0])
+                #last_coordinate = current_coordinate
+
+                current_arm_number = current_arm_number + 1
+            if last_arm_coordinate:
+                for x in range(0, len(current_arm_coordinate)):
+                    arcade.draw_lines(point_list=(last_arm_coordinate[x][2], current_arm_coordinate[x][2]), line_width=1, color=current_arm_coordinate[x][0])
+
+            last_arm_coordinate = current_arm_coordinate
+
+        if self.enable_arms:
+            current_arm_set = self.rotatix_sketch.rasterize(iteration=self.iteration, x=self.x + centerx,
+                                                            y=self.y + centery)
+
+            point = self.x + centerx, self.y + centery
+            for draw, color_in, color_out, x, y in current_arm_set:
+                arcade.draw_lines(point_list=(point, (x, y)), color=color_in, line_width=3)
+                point = x, y
+        if self.draw_border:
+            dimensions = self.rotatix_sketch.rasterize_size()
+            arcade.draw_rectangle_outline(center_x=self.x + centerx, center_y=self.y + centery, border_width=3, width=dimensions[0] * 2, height=dimensions[1] * 2, color=((127, 127, 127), (255, 0, 0))[self.active])
+
+    """
     def render(self, centerx=0, centery=0):
         last_coordinate = None
 
 
         for current_coordinate in self.rotatix_drawing_coordinates:
+            print ("Current_Coordinate: " + str(current_coordinate))
             current_coordinate = (current_coordinate[0] + self.x + centerx, current_coordinate[1] + self.y + centery)
             if last_coordinate:
-                arcade.draw_lines(point_list=(last_coordinate, current_coordinate), line_width=2, color=(0, 0, 0))
+                arcade.draw_lines(point_list=(last_coordinate, current_coordinate), line_width=1, color=(0, 0, 0))
             last_coordinate = current_coordinate
 
         if self.enable_arms:
@@ -123,6 +192,7 @@ class Rotatix_Sketch_Entity:
         if self.draw_border:
             dimensions = self.rotatix_sketch.rasterize_size()
             arcade.draw_rectangle_outline(center_x=self.x + centerx, center_y=self.y + centery, border_width=3, width=dimensions[0]*2, height=dimensions[1]*2, color=((127,127,127),(255,0,0))[self.active])
+    """
     def toggle_arms(self):
         self.enable_arms = not self.enable_arms
         return self.enable_arms
@@ -189,7 +259,6 @@ class Rotatix_Arcade(arcade.Window):
                 best_found = False
 
                 for sketch in self.sketch_entities:
-                    #sketch_size = (sketch.rotatix_sketch.rasterize_size()[0] ^ 2 * 2) ^ (2 ^ -1)
                     sketch_size = sketch.rotatix_sketch.rasterize_size()[0] + 20
                     offset_x = abs(x - sketch.x)
                     offset_y = abs(y - sketch.y)
@@ -216,6 +285,9 @@ class Rotatix_Arcade(arcade.Window):
                 new_sketch.active = True
 
                 self.active_sketch = new_sketch
+
+                #TODO: New = False
+                new_sketch.update(new=True)
 
                 self.sketch_entities.append(new_sketch)
 
